@@ -74,7 +74,7 @@ def login(body: LoginBody) -> dict[str, Any]:
     return {"token": token, "principal": _pub(p)}
 
 
-@router.get("/me")
+@router.get("/auth/me")
 def me(p=Depends(principal)) -> dict[str, Any]:
     return _pub(p)
 

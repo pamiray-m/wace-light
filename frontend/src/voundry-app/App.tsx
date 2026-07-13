@@ -22,7 +22,12 @@ export function WaceLogo({ size = 28 }: { size?: number }): React.ReactElement {
 
 function Console(): React.ReactElement {
   const { principal, logout } = useAuth();
-  const [lightDone, setLightDone] = React.useState(() => (principal ? hasLightOnboarded(principal.account_id) : false));
+  const [lightDone, setLightDone] = React.useState(false);
+  // principal resolves asynchronously (after /auth/me), so read the onboarded
+  // flag once it lands — not in a useState initializer while it's still null.
+  React.useEffect(() => {
+    if (principal) setLightDone(hasLightOnboarded(principal.account_id));
+  }, [principal]);
   if (!principal) return <AuthScreen onBrowsePublic={() => undefined} />;
   if (!lightDone) {
     return (

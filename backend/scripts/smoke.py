@@ -22,7 +22,7 @@ def main() -> int:
     assert r.status_code == 200, f"register: {r.status_code} {r.text}"
     h = {"Authorization": f"Bearer {r.json()['token']}"}
 
-    assert c.get("/voundry/me", headers=h).status_code == 200, "me"
+    assert c.get("/voundry/auth/me", headers=h).status_code == 200, "me"
     wu = c.post("/voundry/portal/my-desk", json={"role": "it_ops"}, headers=h).json()["work_unit_id"]
     assert c.get(f"/voundry/portal/workspaces/{wu}", headers=h).status_code == 200, "room"
     assert len(c.get("/voundry/portal/onboarding-suite?role=it_ops", headers=h).json()["basic"]) > 0, "onboarding"

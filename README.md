@@ -11,6 +11,8 @@ and **every action is recorded in a tamper-evident (WORM) log** you can replay.
 > WACE Light is the individual edition of WACE. The commercial edition adds
 > multi-user org management (SSO/SCIM/SAML), team governance, and more.
 
+![The WACE Light console — governed Smart Workspace](docs/console.png)
+
 ## Why it's different
 
 - **Bring your own key (BYOK).** Your Anthropic key is sealed at rest with
