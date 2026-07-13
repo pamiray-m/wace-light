@@ -1,7 +1,7 @@
 import React from "react";
 import * as api from "../api";
 import {
-  BpButton, BpPlate, BpStamp, notify,
+  BpButton, BpInput, BpPlate, BpStamp, notify,
   GREEN, INK, INK_SOFT, LINE, MONO, PAPER_2, SIENNA,
 } from "../blueprint";
 
@@ -59,6 +59,17 @@ export function LightOnboarding({ accountId, onDone }: { accountId: string; onDo
   const [wuId, setWuId] = React.useState<string>("");
   const [role, setRole] = React.useState<string>("");
   const [states, setStates] = React.useState<Record<string, TileState>>({});
+  const [aiKey, setAiKey] = React.useState("");
+  const [aiSaved, setAiSaved] = React.useState(false);
+  const [aiBusy, setAiBusy] = React.useState(false);
+
+  React.useEffect(() => { api.llmConfig().then((c) => setAiSaved(c.configured)).catch(() => undefined); }, []);
+  const saveAiKey = async () => {
+    if (!aiKey.trim()) { notify("sienna", "Paste your Anthropic key (sk-ant-…)."); return; }
+    setAiBusy(true);
+    try { await api.setLlmKey(aiKey.trim(), true); setAiSaved(true); setAiKey(""); notify("green", "AI key saved ✓ — your agents run on your Anthropic account."); }
+    catch (e) { notify("sienna", (e as Error).message); } finally { setAiBusy(false); }
+  };
 
   // Ensure a personal desk (default role) + load the basic suite up front.
   React.useEffect(() => {
@@ -124,7 +135,24 @@ export function LightOnboarding({ accountId, onDone }: { accountId: string; onDo
         <BpPlate title="Connect your day-to-day tools" plate="STEP 1 OF 4">
           <div style={{ padding: 14 }}>
             <div style={{ fontFamily: MONO, fontSize: 11, color: INK_SOFT, lineHeight: 1.6, marginBottom: 12 }}>
-              These are the basics most seats use every day. Your <b style={{ color: INK }}>AI Assistant</b> is already on. Connect what you use — you can add or finish any of these later in the console. Everything is read-only by default, guarded, and receipted.
+              These are the basics most seats use every day. Connect what you use — you can add or finish any of these later in the console. Everything is read-only by default, guarded, and receipted.
+            </div>
+            {/* Bring your own AI key — front and centre. Sealed at rest; your account is billed. */}
+            <div data-testid="wace-byok" style={{ border: `1px solid ${aiSaved ? GREEN : INK}`, borderLeft: `3px solid ${aiSaved ? GREEN : INK}`, background: PAPER_2, padding: "11px 13px", marginBottom: 14 }}>
+              <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: INK, marginBottom: 4 }}>✦ Your AI — bring your own key</div>
+              {aiSaved ? (
+                <div data-testid="wace-byok-ok" style={{ fontFamily: MONO, fontSize: 11, color: GREEN }}>✓ Key saved — your agents run on your Anthropic account. Change it later in the console.</div>
+              ) : (
+                <>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, color: INK_SOFT, lineHeight: 1.5, marginBottom: 8 }}>
+                    WACE Light is bring-your-own-key. Paste your Anthropic key — it's sealed at rest (AES-256-GCM) and only ever sent to Anthropic. You can also skip this and add it later.
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <BpInput value={aiKey} onChange={(e) => setAiKey(e.target.value)} placeholder="sk-ant-…" type="password" data-testid="wace-byok-input" style={{ flex: 1, minWidth: 220 }} />
+                    <BpButton tone="green" data-testid="wace-byok-save" disabled={aiBusy} onClick={() => void saveAiKey()}>{aiBusy ? "…" : "Save key"}</BpButton>
+                  </div>
+                </>
+              )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
               {(suite?.basic || []).map((t) => <Tile key={t.key} tile={t} state={states[t.key] || "idle"} onConnect={() => void connect(t)} />)}

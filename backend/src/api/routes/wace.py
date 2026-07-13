@@ -592,3 +592,29 @@ def sso_config(p=Depends(principal)) -> dict[str, Any]:
 @router.get("/portal/saml-config")
 def saml_config(p=Depends(principal)) -> dict[str, Any]:
     return {"enabled": False, "enterprise_only": True}
+
+
+# --- enterprise mutations (commercial edition only) ------------------------
+# The console's SSO/SCIM/SAML/user-management panels post here. In the
+# individual edition they degrade to a clear 422 instead of a 404 crash.
+
+_ENTERPRISE = "This is available in the commercial (team) edition of WACE, not the individual edition."
+
+
+@router.post("/portal/sso-config")
+@router.post("/portal/saml-config")
+@router.post("/portal/scim-token")
+@router.post("/portal/governor-group")
+@router.post("/portal/users/bulk-active")
+def _enterprise_post(p=Depends(principal)) -> dict[str, Any]:
+    raise HTTPException(status_code=422, detail=_ENTERPRISE)
+
+
+@router.post("/portal/users/{account_id}/active")
+def _enterprise_user_active(account_id: str, p=Depends(principal)) -> dict[str, Any]:
+    raise HTTPException(status_code=422, detail=_ENTERPRISE)
+
+
+@router.get("/portal/users.csv")
+def _enterprise_users_csv(p=Depends(principal)) -> dict[str, Any]:
+    raise HTTPException(status_code=422, detail=_ENTERPRISE)
