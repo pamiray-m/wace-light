@@ -1,6 +1,4 @@
 import React from "react";
-import maibLogo from "@frontend/assets/maib-logo.png";
-import aos1Logo from "@frontend/assets/aos1-logo.png";
 
 /* Voundry "Foundry Blueprint" shared design system — used across every portal.
  * Parchment + blueprint grid, drafting-blue ink, monospace, drawing plates,
@@ -276,20 +274,24 @@ export const BRAND = {
 
 /** The two parent logos (mAIb + AOS-1), height-constrained. `prominent` is the
  * big landing-page treatment; the default footer size is small. */
+// The open-source individual edition ships no parent-company logos — just a
+// clean WACE wordmark (a converging-W mark + the command baseline).
 export function BpLogos(
   { height = 22, label = false }: { height?: number; label?: boolean },
 ): React.ReactElement {
-  const imgStyle: React.CSSProperties = { height, width: "auto", display: "block", objectFit: "contain" };
   return (
-    <div data-testid="brand-logos" style={{ display: "inline-flex", alignItems: "center", gap: height * 0.6 }}>
-      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-        <img src={maibLogo} alt="mAIb Tech" title="mAIb Tech" style={imgStyle} />
-        {label && <span style={{ fontFamily: MONO, fontSize: 8, color: INK_SOFT, letterSpacing: "0.1em" }}>OPERATOR</span>}
-      </span>
-      <span aria-hidden style={{ color: INK_SOFT, fontFamily: MONO, fontSize: height * 0.5 }}>×</span>
-      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-        <img src={aos1Logo} alt="AOS-1" title="AOS-1 Operating System" style={imgStyle} />
-        {label && <span style={{ fontFamily: MONO, fontSize: 8, color: INK_SOFT, letterSpacing: "0.1em" }}>PLATFORM</span>}
+    <div data-testid="brand-logos" style={{ display: "inline-flex", alignItems: "center", gap: height * 0.4 }}>
+      <svg width={height} height={height} viewBox="0 0 64 64" aria-label="WACE" style={{ display: "block", flexShrink: 0 }}>
+        <rect x="3" y="3" width="58" height="58" rx="15" fill="#16315B" />
+        <path d="M15 19 L23.5 44 L32 29.5 L40.5 44 L49 19" fill="none" stroke="#35D0E0" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="32" cy="29.5" r="3.4" fill="#37C08A" />
+        <line x1="15" y1="51" x2="49" y2="51" stroke="#35D0E0" strokeWidth="2.4" strokeLinecap="round" strokeOpacity="0.75" />
+      </svg>
+      <span style={{ display: "inline-flex", flexDirection: "column" }}>
+        <span style={{ fontFamily: MONO, fontSize: height * 0.62, fontWeight: 800, letterSpacing: "0.14em", color: INK }}>
+          <span style={{ color: "#1287A0" }}>W</span>ACE
+        </span>
+        {label && <span style={{ fontFamily: MONO, fontSize: 8, color: INK_SOFT, letterSpacing: "0.16em" }}>LIGHT</span>}
       </span>
     </div>
   );
