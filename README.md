@@ -30,7 +30,17 @@ and **every action is recorded in a tamper-evident (WORM) log** you can replay.
 
 ## Quickstart
 
-### 1. Backend
+### Fastest: one command
+```bash
+./dev.sh
+```
+Generates your secrets on first run, installs backend + frontend deps, and
+starts both. Then open **http://localhost:5173**, sign up, and go. To use your
+own AI, add `ANTHROPIC_API_KEY` to `backend/.env` or set your key in-app.
+
+### Or run the pieces yourself
+
+#### 1. Backend
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
@@ -45,7 +55,7 @@ export AOS_DB_URL="sqlite:///./wace_light.db"
 uvicorn src.main:app --reload --port 8000
 ```
 
-### 2. Frontend
+#### 2. Frontend
 ```bash
 cd frontend
 npm install
