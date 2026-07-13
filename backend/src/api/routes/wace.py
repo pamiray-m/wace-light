@@ -121,6 +121,10 @@ def workspace_room(work_unit_id: str, p=Depends(principal)) -> dict[str, Any]:
 
 class ConnectBody(BaseModel):
     connector_key: str
+    label: str = ""
+    bridge_id: str = ""
+    custom_spec: Optional[dict] = None
+    cloud_config: Optional[dict] = None
 
 
 class InvokeBody(BaseModel):
@@ -139,7 +143,34 @@ def connect(work_unit_id: str, body: ConnectBody, p=Depends(principal)) -> dict[
     from src.aos.voundry.connectors import ConnectorError, connector_service
     _own(_cid(p), work_unit_id)
     try:
-        return connector_service.connect(_cid(p), work_unit_id, connector_key=body.connector_key)
+        return connector_service.connect(_cid(p), work_unit_id, connector_key=body.connector_key,
+                                         label=body.label, bridge_id=body.bridge_id,
+                                         custom_spec=body.custom_spec, cloud_config=body.cloud_config)
+    except ConnectorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/portal/workspaces/{work_unit_id}/connectors/{connected_id}/authorize-url")
+def authorize_url(work_unit_id: str, connected_id: str, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import ConnectorError, connector_service
+    _own(_cid(p), work_unit_id)
+    try:
+        return {"authorize_url": connector_service.authorize_url_for(_cid(p), work_unit_id, connected_id)}
+    except ConnectorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+class CustomTestBody(BaseModel):
+    custom_spec: dict
+    bridge_id: str = ""
+
+
+@router.post("/portal/workspaces/{work_unit_id}/custom-test")
+def custom_test(work_unit_id: str, body: CustomTestBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import ConnectorError, connector_service
+    _own(_cid(p), work_unit_id)
+    try:
+        return connector_service.test_custom_spec(_cid(p), work_unit_id, custom_spec=body.custom_spec, bridge_id=body.bridge_id)
     except ConnectorError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -239,3 +270,325 @@ def receipts(work_unit_id: str, p=Depends(principal)) -> list[dict]:
     from src.aos.voundry.governance import voundry_audit
     _own(_cid(p), work_unit_id)
     return voundry_audit.list_for_resource(work_unit_id, limit=200)
+
+
+# --- agents: request / run / investigate / shift-report --------------------
+
+class AgentKeyBody(BaseModel):
+    agent_key: str
+
+
+class RunBody(BaseModel):
+    agent_key: str
+    brief: str
+
+
+class InvestigateBody(BaseModel):
+    agent_key: str
+    incident: str
+
+
+@router.post("/portal/workspaces/{work_unit_id}/agents/request")
+def request_agent(work_unit_id: str, body: AgentKeyBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.contributor_workspace import contributor_workspace_service
+    _own(_cid(p), work_unit_id)
+    try:
+        return contributor_workspace_service.request_agent(_cid(p), work_unit_id, body.agent_key)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/portal/workspaces/{work_unit_id}/agents/run")
+def run_agent(work_unit_id: str, body: RunBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.agent_runtime import AgentRunError, agent_runtime
+    _own(_cid(p), work_unit_id)
+    try:
+        return agent_runtime.run(contributor_id=_cid(p), work_unit_id=work_unit_id,
+                                 agent_key=body.agent_key, brief=body.brief).model_dump(mode="json")
+    except AgentRunError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/portal/workspaces/{work_unit_id}/agents/investigate")
+def investigate(work_unit_id: str, body: InvestigateBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.agent_runtime import AgentRunError, agent_runtime
+    _own(_cid(p), work_unit_id)
+    try:
+        return agent_runtime.investigate(contributor_id=_cid(p), work_unit_id=work_unit_id,
+                                         agent_key=body.agent_key, incident=body.incident)
+    except AgentRunError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/portal/workspaces/{work_unit_id}/agents/shift-report")
+def shift_report(work_unit_id: str, body: AgentKeyBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.agent_runtime import AgentRunError, agent_runtime
+    _own(_cid(p), work_unit_id)
+    try:
+        return agent_runtime.shift_report(contributor_id=_cid(p), work_unit_id=work_unit_id, agent_key=body.agent_key)
+    except AgentRunError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+# --- Flight Recorder: saved files ------------------------------------------
+
+class SaveFileBody(BaseModel):
+    name: str
+    content: str
+    kind: str = "note"
+    source_agent_key: str = ""
+    source_agent_name: str = ""
+
+
+@router.post("/portal/workspaces/{work_unit_id}/files")
+def save_file(work_unit_id: str, body: SaveFileBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.contributor_workspace import contributor_workspace_service
+    _own(_cid(p), work_unit_id)
+    return contributor_workspace_service.save_file(
+        _cid(p), work_unit_id, name=body.name, content=body.content, kind=body.kind,
+        source_agent_key=body.source_agent_key, source_agent_name=body.source_agent_name)
+
+
+@router.delete("/portal/workspaces/{work_unit_id}/files/{file_id}")
+def delete_file(work_unit_id: str, file_id: str, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.contributor_workspace import contributor_workspace_service
+    _own(_cid(p), work_unit_id)
+    contributor_workspace_service.delete_file(_cid(p), work_unit_id, file_id)
+    return {"ok": True, "deleted": file_id}
+
+
+# --- governed write-back approvals -----------------------------------------
+
+class DecideBody(BaseModel):
+    approve: bool
+    reason: str = ""
+
+
+@router.get("/portal/approvals")
+def approvals(p=Depends(principal)) -> list[dict]:
+    from src.aos.voundry.connectors import connector_service
+    return connector_service.list_pending_write_backs()
+
+
+@router.post("/portal/approvals/{request_id}/decide")
+def decide(request_id: str, body: DecideBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import ConnectorError, connector_service
+    try:
+        return connector_service.decide_write_back(_cid(p), request_id, approve=body.approve, reason=body.reason)
+    except ConnectorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/portal/receipts")
+def all_receipts(p=Depends(principal)) -> list[dict]:
+    from src.aos.voundry.governance import voundry_audit
+    return voundry_audit.list_recent(limit=500)
+
+
+# --- desk thread (comms) ---------------------------------------------------
+
+class PostMsgBody(BaseModel):
+    body: str
+
+
+@router.get("/portal/work-units/{work_unit_id}/messages")
+def thread(work_unit_id: str, p=Depends(principal)) -> list[dict]:
+    from src.aos.voundry.workspace import workspace_service
+    _own(_cid(p), work_unit_id)
+    return workspace_service.thread(work_unit_id)
+
+
+@router.post("/portal/work-units/{work_unit_id}/messages")
+def post_message(work_unit_id: str, body: PostMsgBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.workspace import WorkspaceError, workspace_service
+    _own(_cid(p), work_unit_id)
+    try:
+        return workspace_service.post(work_unit_id, author_id=_cid(p), author_role="contributor", body=body.body).model_dump(mode="json")
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+# --- saved SQL queries -----------------------------------------------------
+
+class SaveQueryBody(BaseModel):
+    name: str
+    sql: str
+
+
+@router.get("/portal/workspaces/{work_unit_id}/sql/queries")
+def list_queries(work_unit_id: str, p=Depends(principal)) -> list[dict]:
+    from src.aos.voundry.persistence.repository import voundry_repo
+    _own(_cid(p), work_unit_id)
+    return voundry_repo.list_queries_for_work_unit(work_unit_id)
+
+
+@router.post("/portal/workspaces/{work_unit_id}/sql/queries")
+def save_query(work_unit_id: str, body: SaveQueryBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.contracts import SavedQuery
+    from src.aos.voundry.persistence.repository import voundry_repo
+    _own(_cid(p), work_unit_id)
+    q = SavedQuery(work_unit_id=work_unit_id, contributor_id=_cid(p), name=body.name, sql=body.sql)
+    voundry_repo.save_query(q)
+    return q.model_dump(mode="json")
+
+
+@router.delete("/portal/workspaces/{work_unit_id}/sql/queries/{query_id}")
+def delete_query(work_unit_id: str, query_id: str, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.persistence.repository import voundry_repo
+    _own(_cid(p), work_unit_id)
+    voundry_repo.delete_query(query_id)
+    return {"ok": True, "deleted": query_id}
+
+
+# --- governed terminal: explain + saved runbooks ---------------------------
+
+class ExplainBody(BaseModel):
+    host: str = ""
+    command: str = ""
+    output: str = ""
+
+
+@router.post("/portal/workspaces/{work_unit_id}/terminal/explain")
+def explain(work_unit_id: str, body: ExplainBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.agent_runtime import agent_runtime
+    _own(_cid(p), work_unit_id)
+    return agent_runtime.explain_terminal(contributor_id=_cid(p), work_unit_id=work_unit_id,
+                                          host=body.host, command=body.command, output=body.output)
+
+
+class SaveRunbookBody(BaseModel):
+    name: str
+    commands: list[str] = []
+
+
+@router.get("/portal/workspaces/{work_unit_id}/terminal/runbooks")
+def list_runbooks(work_unit_id: str, p=Depends(principal)) -> list[dict]:
+    from src.aos.voundry.persistence.repository import voundry_repo
+    _own(_cid(p), work_unit_id)
+    return voundry_repo.list_runbooks_for_work_unit(work_unit_id)
+
+
+@router.post("/portal/workspaces/{work_unit_id}/terminal/runbooks")
+def save_runbook(work_unit_id: str, body: SaveRunbookBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.contracts import TerminalRunbook
+    from src.aos.voundry.persistence.repository import voundry_repo
+    _own(_cid(p), work_unit_id)
+    rb = TerminalRunbook(work_unit_id=work_unit_id, contributor_id=_cid(p), name=body.name, commands=body.commands)
+    voundry_repo.save_runbook(rb)
+    return rb.model_dump(mode="json")
+
+
+@router.delete("/portal/workspaces/{work_unit_id}/terminal/runbooks/{runbook_id}")
+def delete_runbook(work_unit_id: str, runbook_id: str, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.persistence.repository import voundry_repo
+    _own(_cid(p), work_unit_id)
+    voundry_repo.delete_runbook(runbook_id)
+    return {"ok": True, "deleted": runbook_id}
+
+
+@router.get("/portal/workspaces/{work_unit_id}/terminal/hosts")
+def terminal_hosts(work_unit_id: str, p=Depends(principal)) -> list[dict]:
+    return []   # SSH hosts come via an on-prem bridge; none by default in the individual edition.
+
+
+# --- on-prem connector bridges ---------------------------------------------
+
+class PairBridgeBody(BaseModel):
+    name: str = "On-prem bridge"
+
+
+@router.get("/portal/workspaces/{work_unit_id}/bridges")
+def list_bridges(work_unit_id: str, p=Depends(principal)) -> list[dict]:
+    from src.aos.voundry.bridge import bridge_service
+    _own(_cid(p), work_unit_id)
+    return bridge_service.list_for(work_unit_id)
+
+
+@router.post("/portal/workspaces/{work_unit_id}/bridge")
+def pair_bridge(work_unit_id: str, body: PairBridgeBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.bridge import bridge_service
+    _own(_cid(p), work_unit_id)
+    return bridge_service.pair(_cid(p), work_unit_id, name=body.name)
+
+
+@router.get("/portal/workspaces/{work_unit_id}/bridge/activity")
+def bridge_activity(work_unit_id: str, bridgeId: str = "", p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.bridge import bridge_service
+    _own(_cid(p), work_unit_id)
+    return bridge_service.activity(work_unit_id, bridgeId or None)
+
+
+@router.delete("/portal/workspaces/{work_unit_id}/bridge/{bridge_id}")
+def revoke_bridge(work_unit_id: str, bridge_id: str, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.bridge import bridge_service
+    _own(_cid(p), work_unit_id)
+    bridge_service.revoke(work_unit_id, bridge_id)
+    return {"ok": True, "revoked": bridge_id}
+
+
+# --- command center: telemetry + org policy + org tools --------------------
+
+class OrgToolBody(BaseModel):
+    name: str
+    category: str = "data"
+    custom_spec: dict
+
+
+@router.get("/portal/command-center")
+def command_center(p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import connector_service
+    return connector_service.command_center()
+
+
+@router.get("/portal/policy")
+def get_policy(p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import get_org_policy
+    return get_org_policy()
+
+
+@router.post("/portal/policy")
+def set_policy(patch: dict, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import set_org_policy
+    return set_org_policy(patch)
+
+
+@router.post("/portal/org-tools")
+def add_org_tool(body: OrgToolBody, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import add_org_tool as add
+    return add(body.name, body.custom_spec, body.category)
+
+
+@router.delete("/portal/org-tools/{key}")
+def remove_org_tool(key: str, p=Depends(principal)) -> dict[str, Any]:
+    from src.aos.voundry.connectors import remove_org_tool as rm
+    rm(key)
+    return {"ok": True, "removed": key}
+
+
+# --- enterprise identity (commercial edition only) -------------------------
+# The individual edition has no team management; these degrade gracefully so
+# the console's admin panels render "not available" instead of erroring.
+
+@router.get("/portal/users")
+def users(p=Depends(principal)) -> list[dict]:
+    return []
+
+
+@router.get("/portal/groups")
+def groups(p=Depends(principal)) -> list[dict]:
+    return []
+
+
+@router.get("/portal/scim-token")
+def scim_token(p=Depends(principal)) -> dict[str, Any]:
+    return {"configured": False, "enterprise_only": True}
+
+
+@router.get("/portal/sso-config")
+def sso_config(p=Depends(principal)) -> dict[str, Any]:
+    return {"enabled": False, "enterprise_only": True}
+
+
+@router.get("/portal/saml-config")
+def saml_config(p=Depends(principal)) -> dict[str, Any]:
+    return {"enabled": False, "enterprise_only": True}
