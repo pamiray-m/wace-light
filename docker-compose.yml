@@ -1,0 +1,17 @@
+# WACE Light — local run. `docker compose up` starts the backend on :8000.
+# Build the frontend separately (cd frontend && npm install && npm run dev),
+# or serve frontend/dist behind any static host.
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      AOS_JWT_SECRET: ${AOS_JWT_SECRET:?set AOS_JWT_SECRET in .env}
+      AOS_VAULT_KEY: ${AOS_VAULT_KEY:?set AOS_VAULT_KEY in .env}
+      AOS_DB_URL: ${AOS_DB_URL:-sqlite:////data/wace_light.db}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - wace_data:/data
+volumes:
+  wace_data:
